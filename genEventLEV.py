@@ -1,5 +1,5 @@
 import sys, getopt, os, re, random, string
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # to do list
 #   1) get arguments OK
@@ -8,7 +8,9 @@ from datetime import datetime
 #   4) generate obu o pan OK
 #   5) create folder viaggio OK
 #   6) create switch case from tratta OK
-#   7) operazione su idTemp
+#   7) operazione su idTemp OK
+#   8) creazione xml eventi
+#       8.1) entrata: rete, punto, ts, plaet, set (cod_sp, sp, naz_sp) o obu, dataoramittente
 
 
 def getArgs(argv) :
@@ -120,14 +122,72 @@ def genApparato(dict) :
 
     return apparato
 
+def genIdTemporaliXevento(dict, evento, tratta) :
+    
+    sysdate = datetime.now()
+    
+    if evento == "E" :
+        min_timeout=dict["old_entrata"]
+        id_temp_entrata = sysdate + timedelta(minutes=-(int(timeout_apparato) - int(min_timeout)))
+        id_temp_entrata = id_temp_entrata.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
+        return id_temp_entrata
+    
+    elif evento == "I" :
+        min_timeout=params_list["old_itinere"]
+        id_temp_itinere = sysdate + timedelta(minutes=-(int(timeout_apparato) - int(min_timeout)))
+        id_temp_itinere = id_temp_itinere.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
+        return id_temp_itinere
+    
+    elif evento == "U" :
+        min_timeout=params_list["old_uscita"]
+        id_temp_uscita = sysdate + timedelta(minutes=-(int(timeout_apparato) - int(min_timeout)))
+        id_temp_uscita = id_temp_uscita.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
+        return id_temp_uscita
 
+    elif evento == "S" and tratta in ("EUS", "US") :
+        min_timeout=params_list["old_svincoloDopo"]
+        dir_svincolo = "998"
+        aperto_bool = False
+        aperto_bool == True if tratta == "US" else False 
+        id_temp_svincolo = sysdate + timedelta(minutes=-(int(timeout_apparato) - int(min_timeout)))
+        id_temp_svincolo = id_temp_svincolo.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
+        return (id_temp_svincolo, dir_svincolo)
+    
+    elif evento == "S" and tratta in ("SEU", "SU") :
+        min_timeout=params_list["old_svincoloPrima"]
+        dir_svincolo = "997"
+        aperto_bool = False
+        aperto_bool == True if tratta == "US" else False 
+        id_temp_svincolo = sysdate + timedelta(minutes=-(int(timeout_apparato) - int(min_timeout)))
+        id_temp_svincolo = id_temp_svincolo.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
+        return (id_temp_svincolo, dir_svincolo)
+
+def genEventoEntrataXml(rete, punto, id_temp, targa, cod_sp, naz_prov, cod_apparato, apparato) :
+    ev1 = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
+    <tipoEvento cod="E" />
+    <idSpaziale periferica="62" progrMsg="1" corsia="0" dirMarcia="1" tipoPeriferica="P" rete="{r}" punto="{p}" />
+    <idTemporale>{id_temp}</idTemporale>
+    <infoVeicolo classe="10">
+        <targaAnt nomeFile="targaAnt.jpg" affid="9" nazione="IT">{t}</targaAnt>
+        <targaPost nomeFile="targaPost.jpg" affid="9" nazione="IT">{t}</targaPost>
+        <targaRif nazione="IT">{t}</targaRif>\n'''.format(r = rete, p = punto, id_temp = id_temp, t = targa)  
+            
+    ev2 = '''		<SET CodiceIssuer="{c_sp}" PAN="{pan}" nazione="{n_prov}" EFCContextMark="604006001D09"/>\n'''.format(c_sp = cod_sp, n_prov = naz_prov,  pan = apparato) if cod_apparato == "SET" else '''        <OBU>{obu}</OBU>\n'''.format(obu = apparato)
+            
+    ev3 = '''    </infoVeicolo>
+    <reg dataOraMittente="{ts}" />
+</ns0:evento>'''.format(ts = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00")
+            
+    xml_eve = ev1 + ev2 + ev3
+    return xml_eve
 
 args_dict = getArgs(sys.argv)
-config_file = "gen_events_conf.xml"
+config_file = 'gen_events_conf.xml'
 
 # check file conf
 if os.path.isfile("./"+ config_file) :
-    print("\n...recovered configuration params from file", config_file + "\n")
+    print(f"\n...recovered configuration params from file '{config_file}'\n")
     params_list = getParamsFromFile(config_file)
 else :
     print("\n...configuration file not found, I'll use default params\n")
@@ -137,18 +197,23 @@ out_dir = "OUT_DIR_EVENTS"
 pos_res=("Y", "y")
 neg_res=("N", "n")
 dati_entrata = True if args_dict["arg_bool_dati_entrata"] in (pos_res) else False
-cod_apparato = "OBU" if args_dict["arg_cod_apparato"] == "o" else "SET"
+cod_apparato, timeout_name = ("OBU", "it.aitek.auto.pr.viaggi.close_cert_timeout_hours") if args_dict["arg_cod_apparato"] == "o" else ("SET", "it.aitek.auto.pr.viaggi.close_cert_timeout_hours")
 timeout_apparato = params_list["timeout_SET"] if args_dict["arg_cod_apparato"] == "s" else params_list["timeout_OBU"]
 tratta = args_dict["arg_tratta"]
+tipo_viaggio = "Aperto" if tratta in ("US", "SU") else "Chiuso"
+provider_list = str(params_list["providers_code"]).split(",")
+naz_provider_list = str(params_list["naz_providers"]).split(",")
+cod_service_provider = str(args_dict["arg_service_provider"])
+naz_prov = naz_provider_list[provider_list.index("47")]
 
 # check output directory
 if os.path.exists(out_dir) :
     path_out_dir = os.path.abspath(out_dir)
-    print("...", out_dir, "found at path:", path_out_dir, "\n")
+    print(f"...'{out_dir}' found at path : '{path_out_dir}' \n")
 else :
    os.mkdir(out_dir)
    path_out_dir = os.path.abspath(out_dir)
-   print("...created", out_dir, "at path: ", path_out_dir, "\n")
+   print(f"...created '{out_dir}' at path : '{path_out_dir}' \n")
 
 # generate plate and apparato
 plate_number = genPlateNumber()
@@ -158,43 +223,63 @@ apparato = genApparato(args_dict)
 f_de = "-conDatiEntrata" if args_dict["arg_bool_dati_entrata"] in (pos_res) else ""
 f_cc = "-CashbackCantieri" if args_dict["arg_bool_cashback"] in (pos_res) else ""
 
-folder_name = "Viaggio-" + cod_apparato + "-" + tratta + f_de + f_cc
+folder_name = "viaggio" + tipo_viaggio + "-" + cod_apparato + "-" + tratta + f_de + f_cc
 
 if os.path.isdir(path_out_dir + "/" + folder_name):
     os.rmdir(path_out_dir + "/" + folder_name)
     os.mkdir(path_out_dir + "/" + folder_name)
-    print("rimuovo")
+    print(f"...created folder '{folder_name}'\n")
 else : 
     os.mkdir(path_out_dir + "/" + folder_name)
-    print("creo")
-
-# get idTemporali
-
-id_temp_entrata = datetime.now()
-past_time_and_date = id_temp_entrata + datetime.timedelta(days=-0, hours=-0, minutes=-timeout_apparato)
-print(id_temp_entrata)
-print(past_time_and_date)
-print(timeout_apparato)
+    print(f"...created folder '{folder_name}'\n")
 
 
 
-# generate events from tratta
+# generate idTemp and events from tratta
 i=0
+sysdate = datetime.now()
+print(f"...generating idTemporali considering '{timeout_name}' set to '{timeout_apparato}' minutes\n")
+dir_folder_viaggio = path_out_dir + "/" + folder_name + "/"
+
 
 while i < len(tratta) : 
     evento = tratta[i]
-    
     match evento :
         case "E":
+            rete_entrata = args_dict["arg_rete_e"] 
+            punto_entrata = args_dict["arg_punto_e"]
+            f_name = "entrata" + cod_apparato + "-" + punto_entrata + ".xml"
+            
+            id_temp_entrata = genIdTemporaliXevento(params_list, evento = "E", tratta = tratta)
+            
+            evento_entrata_xml = genEventoEntrataXml(
+                rete=rete_entrata, punto=punto_entrata, id_temp=id_temp_entrata, targa=plate_number, 
+                cod_sp=cod_service_provider, naz_prov=naz_prov, cod_apparato=cod_apparato, apparato=apparato)
+            
+            with open(dir_folder_viaggio + f_name, 'w') as file :
+                file.write(evento_entrata_xml)
+            
+            
+            
+            
             i+=1
+
     match evento :
         case "I":
+
+            id_temp_itinere = genIdTemporaliXevento(params_list, evento = "I", tratta = tratta)
             i+=1
+
     match evento :
         case "U":
+            
+            id_temp_uscita = genIdTemporaliXevento(params_list, evento = "U", tratta = tratta)
             i+=1
+
     match evento :
         case "S":
+            
+            id_temp_svincolo, dir_svincolo = genIdTemporaliXevento(params_list, evento = "S", tratta = tratta)
             i+=1
 
 
