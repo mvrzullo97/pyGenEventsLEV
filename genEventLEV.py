@@ -9,9 +9,12 @@ from datetime import datetime, timedelta, timezone
 #   5) create folder viaggio OK
 #   6) create switch case from tratta OK
 #   7) operazione su idTemp OK
-#   8) creazione xml eventi
-#       8.1) entrata: rete, punto, ts, plaet, set (cod_sp, sp, naz_sp) o obu, dataoramittente
+#   8) creazione xml eventi MANCA EVENTO SVINCOLO
+#   9) param dict into func OK
+#   10) CREARE EVENTO SCONTO PER CASHBACK
 
+
+# FUNC ----------------------------------------------------------------------------------------------------
 
 def getArgs(argv) :
     
@@ -162,7 +165,8 @@ def genIdTemporaliXevento(dict, evento, tratta) :
         id_temp_svincolo = id_temp_svincolo.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
         return (id_temp_svincolo, dir_svincolo)
 
-def genEventoEntrataXml(rete, punto, id_temp, targa, cod_sp, naz_prov, cod_apparato, apparato) :
+def genEventoEntrataXml(rete, punto, id_temp, targa, dict_apparato) :
+    
     ev1 = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
     <tipoEvento cod="E" />
@@ -172,8 +176,11 @@ def genEventoEntrataXml(rete, punto, id_temp, targa, cod_sp, naz_prov, cod_appar
         <targaAnt nomeFile="targaAnt.jpg" affid="9" nazione="IT">{t}</targaAnt>
         <targaPost nomeFile="targaPost.jpg" affid="9" nazione="IT">{t}</targaPost>
         <targaRif nazione="IT">{t}</targaRif>\n'''.format(r = rete, p = punto, id_temp = id_temp, t = targa)  
-            
-    ev2 = '''		<SET CodiceIssuer="{c_sp}" PAN="{pan}" nazione="{n_prov}" EFCContextMark="604006001D09"/>\n'''.format(c_sp = cod_sp, n_prov = naz_prov,  pan = apparato) if cod_apparato == "SET" else '''        <OBU>{obu}</OBU>\n'''.format(obu = apparato)
+
+    if dict_apparato["cod_apparato"] == "SET" :
+        ev2 = '''		<SET CodiceIssuer="{c_sp}" PAN="{pan}" nazione="{n_prov}" EFCContextMark="604006001D09"/>\n'''.format(c_sp = dict_apparato["cod_prov"], n_prov = dict_apparato["naz_prov"],  pan = dict_apparato["apparato"])
+    else :
+        ev2 = '''        <OBU>{obu}</OBU>\n'''.format(dict_apparato["apparato"])
             
     ev3 = '''    </infoVeicolo>
     <reg dataOraMittente="{ts}" />
@@ -181,6 +188,95 @@ def genEventoEntrataXml(rete, punto, id_temp, targa, cod_sp, naz_prov, cod_appar
             
     xml_eve = ev1 + ev2 + ev3
     return xml_eve
+
+def genEventoItinereXml(rete, punto, id_temp_i, dict_dati_entrata, dict_apparato) :
+    
+    ev1 = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:evento xmlns:ns2="http://transit.pr.auto.aitek.it/messages">
+	<tipoEvento cod="I"/>
+	<idSpaziale periferica="2" progrMsg="54171" corsia="2" dirMarcia="2" tipoPeriferica="B" rete="{r}" punto="{p}"/>
+	<idTemporale>"{id_temp_i}"</idTemporale>
+	<infoVeicolo classe="10">
+		<targaAnt/>
+		<targaPost/>
+		<targaRif/>\n'''.format(r = rete, p = punto, id_temp_i = id_temp_i)
+    
+    if dict_apparato["cod_apparato"] == "SET" :
+        ev2 = '''		<SET CodiceIssuer="{c_sp}" PAN="{pan}" nazione="{n_prov}" EFCContextMark="604006001D09"/>\n'''.format(  c_sp = dict_apparato["cod_prov"], 
+                                                                                                                                n_prov = dict_apparato["naz_prov"],  
+                                                                                                                                pan = dict_apparato["apparato"])
+    else :
+        ev2 = '''        <OBU>{obu}</OBU>\n'''.format(dict_apparato["apparato"])
+
+    ev3 = '''    </infoVeicolo>
+	<datiEntrata idTemporale="{id_temp_e}" pista="2">
+		<stazione punto="{p_e}"/>
+	</datiEntrata>
+	<reg dataOraMittente="{ts}"/>
+</ns2:evento>'''.format(id_temp_e = dict_dati_entrata["id_temporale_entrata"], p_e = dict_dati_entrata["punto_entrata"], ts = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00")
+
+    xml_eve = ev1 + ev2 + ev3
+    return xml_eve
+
+def genEventoUscitaChiusoXml(rete, punto, id_temp_u, targa, dict_apparato, dict_dati_entrata) :
+    ev1 = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
+    <tipoEvento cod="U" />
+    <idSpaziale periferica="62" progrMsg="4" corsia="0" dirMarcia="1" tipoPeriferica="P" rete="{r}" punto="{p}" />
+    <idTemporale>{id_temp_u}</idTemporale>
+    <infoVeicolo classe="10">
+        <targaAnt nomeFile="targaAnt.jpg" affid="9" nazione="IT">{t}</targaAnt>
+        <targaPost nomeFile="targaPost.jpg" affid="9" nazione="IT">{t}</targaPost>  
+        <targaRif nazione="IT">{t}</targaRif>\n'''.format(r=rete, p=punto, id_temp_u=id_temp_u, t=targa)
+
+    if dict_apparato["cod_apparato"] == "SET" :
+        ev2 = '''		<SET CodiceIssuer="{c_sp}" PAN="{pan}" nazione="{n_prov}" EFCContextMark="604006001D09"/>\n'''.format(  c_sp = dict_apparato["cod_prov"], 
+                                                                                                                                n_prov = dict_apparato["naz_prov"],  
+                                                                                                                                pan = dict_apparato["apparato"])
+
+    ev3 = '''	</infoVeicolo>
+    <idViaggio mezzoPagamento="TL" />\n'''
+
+    ev5 = '''    <reg dataOraMittente="{ts}" />
+</ns0:evento>'''.format(ts = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00")
+
+    if dict_dati_entrata["dati_entrata_bool"] :
+        ev4 = '''	<datiEntrata idTemporale="{id_temp_e}" pista="12" classe="10">
+        <stazione rete = "{r_e}" punto = "{p_e}"/>
+    </datiEntrata>\n'''.format(id_temp_e=dict_dati_entrata["id_temporale_entrata"], r_e=dict_dati_entrata["rete_entrata"], p_e=dict_dati_entrata["punto_entrata"])
+        xml_eve = ev1 + ev2 + ev3 + ev4 + ev5
+    else : 
+        xml_eve = ev1 + ev2 + ev3 + ev5
+    
+    return xml_eve    
+
+def genEventoUscitaApertoXml(rete, punto, id_temp, dict_apparato, dir_uscita) :
+     
+    ev1 = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
+    <tipoEvento cod="U" />
+    <idSpaziale periferica="62" progrMsg="4" corsia="0" dirMarcia="1" tipoPeriferica="P" rete="{r}" punto="{p}" />
+    <idTemporale>{id_temp}</idTemporale>
+    <infoVeicolo classe="10">
+        '''.format(r=rete, p=punto, id_temp_u=id_temp)
+    
+    if dict_apparato["cod_apparato"] == "SET" :
+        ev2 = '''		<SET CodiceIssuer="{c_sp}" PAN="{pan}" nazione="{n_prov}" EFCContextMark="604006001D09"/>\n'''.format(  c_sp = dict_apparato["cod_prov"], 
+                                                                                                                                n_prov = dict_apparato["naz_prov"],  
+                                                                                                                                pan = dict_apparato["apparato"])
+
+    ev3 = '''	</infoVeicolo>
+	<datiEntrata>
+		<stazione rete="{r}" punto="{d}"/>
+	</datiEntrata>
+	<reg dataOraMittente="{ts}"/>
+</ns0:evento>'''.format(r=rete, d=dir_uscita, ts = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00")
+        
+    xml_eve = ev1 + ev2 + ev3
+    return xml_eve  
+
+
+# MAIN -----------------------------------------------------------------------------------------
 
 args_dict = getArgs(sys.argv)
 config_file = 'gen_events_conf.xml'
@@ -194,7 +290,7 @@ else :
 
 #vars declaration
 out_dir = "OUT_DIR_EVENTS"
-pos_res=("Y", "y")
+pos_res=("Y", "y", "s", "S")
 neg_res=("N", "n")
 dati_entrata = True if args_dict["arg_bool_dati_entrata"] in (pos_res) else False
 cod_apparato, timeout_name = ("OBU", "it.aitek.auto.pr.viaggi.close_cert_timeout_hours") if args_dict["arg_cod_apparato"] == "o" else ("SET", "it.aitek.auto.pr.viaggi.close_cert_timeout_hours")
@@ -204,7 +300,7 @@ tipo_viaggio = "Aperto" if tratta in ("US", "SU") else "Chiuso"
 provider_list = str(params_list["providers_code"]).split(",")
 naz_provider_list = str(params_list["naz_providers"]).split(",")
 cod_service_provider = str(args_dict["arg_service_provider"])
-naz_prov = naz_provider_list[provider_list.index("47")]
+naz_prov = naz_provider_list[provider_list.index(cod_service_provider)]
 
 # check output directory
 if os.path.exists(out_dir) :
@@ -225,15 +321,14 @@ f_cc = "-CashbackCantieri" if args_dict["arg_bool_cashback"] in (pos_res) else "
 
 folder_name = "viaggio" + tipo_viaggio + "-" + cod_apparato + "-" + tratta + f_de + f_cc
 
+# verificare che elimini anche i file
 if os.path.isdir(path_out_dir + "/" + folder_name):
-    os.rmdir(path_out_dir + "/" + folder_name)
+    os.remove(path_out_dir + "/" + folder_name)
     os.mkdir(path_out_dir + "/" + folder_name)
     print(f"...created folder '{folder_name}'\n")
 else : 
     os.mkdir(path_out_dir + "/" + folder_name)
     print(f"...created folder '{folder_name}'\n")
-
-
 
 # generate idTemp and events from tratta
 i=0
@@ -241,7 +336,21 @@ sysdate = datetime.now()
 print(f"...generating idTemporali considering '{timeout_name}' set to '{timeout_apparato}' minutes\n")
 dir_folder_viaggio = path_out_dir + "/" + folder_name + "/"
 
+#default
+dir_uscita="997"
+dir_svincolo="998"
 
+#create dict for apparato
+dict_apparato = {"cod_apparato" : cod_apparato,
+                 "cod_prov" : cod_service_provider,
+                 "naz_prov" : naz_prov,
+                 "apparato" : apparato}
+
+if tipo_viaggio == "Aperto" :
+    if tratta == "SU" :
+        dir_uscita = "998"
+        dir_svincolo = "997"
+        
 while i < len(tratta) : 
     evento = tratta[i]
     match evento :
@@ -252,28 +361,47 @@ while i < len(tratta) :
             
             id_temp_entrata = genIdTemporaliXevento(params_list, evento = "E", tratta = tratta)
             
-            evento_entrata_xml = genEventoEntrataXml(
-                rete=rete_entrata, punto=punto_entrata, id_temp=id_temp_entrata, targa=plate_number, 
-                cod_sp=cod_service_provider, naz_prov=naz_prov, cod_apparato=cod_apparato, apparato=apparato)
+            evento_entrata_xml = genEventoEntrataXml(rete_entrata, punto_entrata, id_temp_entrata, plate_number, dict_apparato)
             
             with open(dir_folder_viaggio + f_name, 'w') as file :
                 file.write(evento_entrata_xml)
-            
-            
-            
-            
+
+            dict_dati_entrata = {"dati_entrata_bool" : dati_entrata,
+                                 "rete_entrata" : rete_entrata,
+                                 "punto_entrata" : punto_entrata,
+                                 "id_temporale_entrata" : id_temp_entrata}
             i+=1
 
     match evento :
         case "I":
+            rete_itinere = args_dict["arg_rete_i"]
+            punto_itinere = args_dict["arg_punto_i"]
+            f_name = "itinere" + cod_apparato + "-" + punto_itinere + ".xml"
 
             id_temp_itinere = genIdTemporaliXevento(params_list, evento = "I", tratta = tratta)
+
+            evento_itinere_xml = genEventoItinereXml(rete_itinere, punto_itinere, id_temp_itinere, dict_dati_entrata, dict_apparato)
+            
+            with open(dir_folder_viaggio + f_name, 'w') as file :
+                file.write(evento_itinere_xml)
             i+=1
 
     match evento :
         case "U":
-            
+            rete_uscita = args_dict["arg_rete_u"]
+            punto_uscita = args_dict["arg_punto_u"]
+            de = "-conDatiEntrata" if dati_entrata else ""
+            f_name = "uscita" + tipo_viaggio + cod_apparato + "-" + punto_uscita + de +".xml"
+
             id_temp_uscita = genIdTemporaliXevento(params_list, evento = "U", tratta = tratta)
+            
+            if tipo_viaggio == "Chiuso" :
+                evento_uscita_xml = genEventoUscitaChiusoXml(rete_uscita, punto_uscita, id_temp_uscita, plate_number, dict_apparato, dict_dati_entrata)
+            else : 
+                evento_uscita_xml = genEventoUscitaApertoXml(rete_uscita, punto_uscita, id_temp_uscita, dict_apparato, dir_uscita)
+                
+            with open(dir_folder_viaggio + f_name, 'w') as file :
+                file.write(evento_uscita_xml)
             i+=1
 
     match evento :
