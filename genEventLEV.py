@@ -1,5 +1,5 @@
 import sys, getopt, os, re, random, string
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 
 def getArgs(argv) -> dict:
@@ -313,22 +313,75 @@ def genEventoScontoCashbackXml(dict_cashback) -> string:
 </ns0:evento>'''
     
     return evento_cashback
-     
 
-# MAIN -----------------------------------------------------------------------------------------
+def checkInput(args_dict) -> string:
+    
+    response = ("", "Y", "y", "s", "S", "n", "N")
+    tratta = args_dict["arg_tratta"] 
+    rete_entrata = args_dict["arg_rete_e"] 
+    rete_uscita = args_dict["arg_rete_u"] 
+    rete_itinere = args_dict["arg_rete_i"]
+    rete_svincolo = args_dict["arg_rete_s"] 
+    punto_entrata = args_dict["arg_punto_e"] 
+    punto_uscita = args_dict["arg_punto_u"] 
+    punto_itinere= args_dict["arg_punto_i"] 
+    punto_svincolo = args_dict["arg_punto_s"] 
+    dati_entrata = args_dict["arg_bool_dati_entrata"]
+    cod_apparato = args_dict["arg_cod_apparato"] 
+    cod_service_provider = args_dict["arg_service_provider"] 
+    cashback = args_dict["arg_bool_cashback"]
 
+    if tratta in ("US", "SU") and dati_entrata in pos_res :
+        print(f"\n\Param error(--de) : parametro datiEntrata non ha senso per la tratta '{tratta}'\n")
+        return False
+    
+    elif len(tratta) not in (2,3,4) :
+        print(f"\nParam error (--tr) : la tratta '{tratta} non è valida!\n")
+        return False
+    
+    elif dati_entrata not in response :
+        print(f"\nParam error (--de) : valore del parametro datiEntrata '{dati_entrata}' non valido!\n")
+    
+    elif rete_svincolo not in ("", "37") :
+        print(f"\nParam error (--rs) : rete svincolo '{rete_svincolo}' inesistente!\n")
+        return False
+    
+    elif punto_svincolo not in ("", "427", "428") :
+        print(f"\nParam error (--ps) : punto svincolo '{punto_svincolo}' inesistente!\n")
+        return False
+    
+    elif cod_apparato not in ("s","o") :
+        print(f"\nParam error (--ap) : codice apparato '{cod_apparato}' non valido!\n")
+        return False
+    
+    elif cod_apparato == "o" and cashback in pos_res :
+        print(f"\nParam error (--ap, --cc) : sconto Cashback non disponibile per viaggio OBU!\n")
+        return False
+    
+    elif cashback not in response :
+        print(f"\nParam error (--cc) : valore del parametro Cashback '{cashback}' non valido!\n")
+        return False
+    
+    else :
+        return True
+        
+# ------------------------------------ MAIN ------------------------------------
 
-dumb_dict = {
-        'arg_tratta' : 'EIUS',
+arg_help = "\n    -tr < tratta > (ex. 'EUS')\n    -re < rete Entrata >\n    -pe < punto Entrata >\n    -ri < rete Itinere >\n    -pi < punto Itinere >\n    -ru < rete Uscita >\n    -pu < punto Uscita >\n    -de < datiEntrata > (yYsS or nN)\n    -rs < rete Svincolo >\n    -ps < punto Svincolo >\n    -ap < tipo apparato ('o' for OBU or 's' for SET) >\n    -sp < codice Service Provider >\n    -cc < cashback cantieri (yYsS or nN) >\n"
+
+'''dumb_dict = {
+        'arg_tratta' : 'EUS',
         'arg_rete_e' : '1', 'arg_rete_u' : '1', 'arg_rete_i' : '41', 'arg_rete_s' : '37',
-        'arg_punto_u' : '414', 'arg_punto_e' : '410', 'arg_punto_i' : '666', 'arg_punto_s' : '428',
+        'arg_punto_e' : '414', 'arg_punto_u' : '410', 'arg_punto_i' : '666', 'arg_punto_s' : '428',
         'arg_bool_dati_entrata' : 'y', 'arg_cod_apparato' : 's', 
-        'arg_service_provider' : '151', 'arg_bool_cashback' : 'y' }
+        'arg_service_provider' : '151', 'arg_bool_cashback' : 'y' }'''
 
-
-#args_dict = getArgs(sys.argv)
-args_dict = dumb_dict
+args_dict = getArgs(sys.argv)
 config_file = 'gen_events_conf.xml'
+
+if not checkInput(args_dict) :
+    sys.exit(2)
+    print(f"...lanciare il comando python './genEventiLEV.py --help' per ulteriori informazioni!\n")
 
 # check file di configurazione
 if os.path.isfile("./"+ config_file) :
@@ -346,7 +399,6 @@ else :
                    "old_svincoloDopo" : 5,
                    "providers_code" : '151,2321,3000,7,49',
                    "naz_providers" : 'IT,IT,IT,DE,FR'}
-
 
 out_dir = "OUT_DIR_EVENTS"
 pos_res=("Y", "y", "s", "S")
