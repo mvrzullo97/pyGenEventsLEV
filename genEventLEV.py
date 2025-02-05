@@ -1,20 +1,6 @@
 import sys, getopt, os, re, random, string
 from datetime import datetime, timedelta, timezone
 
-# to do list
-#   1) get arguments OK
-#   2) get params from file OK
-#   3) generate targa OK
-#   4) generate obu o pan OK
-#   5) create folder viaggio OK
-#   6) create switch case from tratta OK
-#   7) operazione su idTemp OK
-#   8) creazione xml eventi MANCA EVENTO SVINCOLO
-#   9) param dict into func OK
-#   10) CREARE EVENTO SCONTO PER CASHBACK
-
-
-# FUNC ----------------------------------------------------------------------------------------------------
 
 def getArgs(argv) -> dict:
     
@@ -304,6 +290,31 @@ def genEventoSvincoloXml(rete, punto, id_temp, dict_apparato, dir_svincolo) -> s
     
     return ev1 + ev2 +ev3
 
+def genEventoScontoCashbackXml(dict_cashback) -> string:
+    
+    ts = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "+01:00"
+
+    evento_cashback = f'''<?xml version="1.0" encoding="UTF-8"?>
+<ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
+	<tipoEvento cod="U"/>
+	<idSpaziale rete="{dict_cashback["rete_uscita"]}" punto="{dict_cashback["punto_uscita"]}" periferica="1" progrMsg="10865" corsia="0" dirMarcia="1" tipoPeriferica="P"/>
+	<idTemporale>{dict_cashback["id_temp_uscita"]}</idTemporale>
+	<infoVeicolo classe="10">
+		<SET CodiceIssuer="{dict_cashback['dict_apparato']["cod_prov"]}" PAN="{dict_cashback['dict_apparato']["apparato"]}" nazione="{dict_cashback['dict_apparato']["naz_prov"]}" EFCContextMark="604006001D09"/>
+	</infoVeicolo>
+	<idViaggio tin="INSERT_TIN_HERE"/>
+	<datiEntrata idTemporale="{dict_cashback['dict_dati_entrata']["id_temporale_entrata"]}">
+		<stazione rete="{dict_cashback['dict_dati_entrata']["rete_entrata"]}" punto="{dict_cashback['dict_dati_entrata']["punto_entrata"]}"/>
+	</datiEntrata>
+	<reg dataOraMittente="{ts}"/>
+	<sconti idMessaggioSconto="1">
+		<sconto importo="5.5" codiceSconto="25"/>
+	</sconti>
+</ns0:evento>'''
+    
+    return evento_cashback
+     
+
 # MAIN -----------------------------------------------------------------------------------------
 
 
@@ -312,25 +323,36 @@ dumb_dict = {
         'arg_rete_e' : '1', 'arg_rete_u' : '1', 'arg_rete_i' : '41', 'arg_rete_s' : '37',
         'arg_punto_u' : '414', 'arg_punto_e' : '410', 'arg_punto_i' : '666', 'arg_punto_s' : '428',
         'arg_bool_dati_entrata' : 'y', 'arg_cod_apparato' : 's', 
-        'arg_service_provider' : '151', 'arg_bool_cashback' : 'n' }
+        'arg_service_provider' : '151', 'arg_bool_cashback' : 'y' }
 
 
 #args_dict = getArgs(sys.argv)
 args_dict = dumb_dict
 config_file = 'gen_events_conf.xml'
 
-# check file conf
+# check file di configurazione
 if os.path.isfile("./"+ config_file) :
     print(f"\n...recupero parametri di configurazione dal file '{config_file}'\n")
     params_list = getParamsFromFile(config_file)
 else :
-    print("\n...configuration file not found, I'll use default params\n")
+    print(f"\n...file di configurazione '{config_file}' non trovato, uso parametri di default\n")
 
-#vars declaration
+    params_list = {"timeout_SET":'720',
+                   "timeout_OBU":'4320',
+                   "old_entrata" : 2,
+                   "old_itinere" : 3,
+                   "old_uscita" : 4,
+                   "old_svincoloPrima": 1,
+                   "old_svincoloDopo" : 5,
+                   "providers_code" : '151,2321,3000,7,49',
+                   "naz_providers" : 'IT,IT,IT,DE,FR'}
+
+
 out_dir = "OUT_DIR_EVENTS"
 pos_res=("Y", "y", "s", "S")
 neg_res=("N", "n")
 dati_entrata = True if args_dict["arg_bool_dati_entrata"] in (pos_res) else False
+cashback = True if args_dict["arg_bool_cashback"] in (pos_res) else False
 cod_apparato, timeout_name = ("OBU", "it.aitek.auto.pr.viaggi.close_cert_timeout_hours") if args_dict["arg_cod_apparato"] == "o" else ("SET", "it.aitek.auto.pr.viaggi.close_cert_timeout_hours")
 timeout_apparato = params_list["timeout_SET"] if args_dict["arg_cod_apparato"] == "s" else params_list["timeout_OBU"]
 tratta = args_dict["arg_tratta"]
@@ -340,7 +362,7 @@ naz_provider_list = str(params_list["naz_providers"]).split(",")
 cod_service_provider = str(args_dict["arg_service_provider"])
 naz_prov = naz_provider_list[provider_list.index(cod_service_provider)]
 
-# check output directory
+
 if os.path.exists(out_dir) :
     path_out_dir = os.path.abspath(out_dir)
     print(f"...cartella '{out_dir}' trovata al path: '{path_out_dir}' \n")
@@ -349,18 +371,16 @@ else :
    path_out_dir = os.path.abspath(out_dir)
    print(f"...cartella '{out_dir}' creata al path: '{path_out_dir}' \n")
 
-# generate plate and apparato
+# generazione Targa e Apparato
 plate_number = genPlateNumber()
 apparato = genApparato(args_dict)
 
-# create tratta dir
 f_de = "-conDatiEntrata" if args_dict["arg_bool_dati_entrata"] in (pos_res) else ""
 f_cc = "-CashbackCantieri" if args_dict["arg_bool_cashback"] in (pos_res) else ""
 
 folder_name = "viaggio" + tipo_viaggio + "-" + cod_apparato + "-" + tratta + f_de + f_cc
 folder_path = path_out_dir + "/" + folder_name
 
-# verificare che elimini anche i file
 if os.path.isdir(folder_path):
     os.remove(folder_path)
     print(f"...cartella esistente rimossa con successo\n")
@@ -370,24 +390,19 @@ else :
     os.mkdir(folder_path)
     print(f"...cartella '{folder_name} creata con successo'\n")
 
-# generate idTemp and events from tratta
+# generazione idTemporali considerando la tratta in input
 i=0
 sysdate = datetime.now()
 print(f"...generazione idTemporali considerando '{timeout_name}' impostato a '{timeout_apparato}' minuti\n")
 
-#default
-dir_uscita="997"
-
-#create dict for apparato
 dict_apparato = {"cod_apparato" : cod_apparato,
                  "cod_prov" : cod_service_provider,
                  "naz_prov" : naz_prov,
                  "apparato" : apparato}
 
-if tipo_viaggio == "Aperto" :
-    if tratta == "SU" :
+dir_uscita="997"
+if tipo_viaggio == "Aperto" and tratta == "SU" :
         dir_uscita = "998"
-        
         
 while i < len(tratta) : 
     evento = tratta[i]
@@ -442,8 +457,7 @@ while i < len(tratta) :
             i+=1
 
     match evento :
-        case "S":
-            
+        case "S":    
             rete_svincolo = args_dict["arg_rete_s"]
             punto_svincolo = args_dict["arg_punto_s"]
 
@@ -458,17 +472,20 @@ while i < len(tratta) :
                 file.write(evento_svincolo)
             i+=1
 
+if cashback :
+    filename = "eventoScontoSET-" + tratta + ".xml"
 
+    dict_cashback = {"dict_dati_entrata" : dict_dati_entrata,
+                     "rete_uscita" : rete_uscita,
+                     "punto_uscita" : punto_uscita,
+                     "id_temp_uscita" : id_temp_uscita,
+                     "dict_apparato" : dict_apparato}
+    
+    evento_sconto_cashback = genEventoScontoCashbackXml(dict_cashback)
 
-
-
-
-
-
-
-
-
-
+    with open(folder_path + "/" + filename, 'w') as file :
+                file.write(evento_sconto_cashback)
+    print("...generazione eventoScontoCashbackCantieri completata\n")
 
 print(f"...generazione finale dati Viaggio\n")
 
@@ -491,7 +508,7 @@ while i < len(tratta) :
             i+=1
         case "S":
             print(f"............{tipo_svincolo} '{punto_svincolo}' il '{id_temp_svincolo}'\n\n")
-            i+=1
+            i+=1    
 
 print(f"...esecuzione terminata, tutti i file sono presenti al path: '{folder_path}'\n")
     
