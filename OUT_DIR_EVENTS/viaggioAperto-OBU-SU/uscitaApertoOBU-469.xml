@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
+    <tipoEvento cod="U" />
+    <idSpaziale periferica="62" progrMsg="4" corsia="0" dirMarcia="1" tipoPeriferica="P" rete="34" punto="469" />
+    <idTemporale>2025-02-02T16:17:22.217+01:00</idTemporale>
+    <infoVeicolo classe="10">
+        <OBU>899720761</OBU>
+		</infoVeicolo>
+	<datiEntrata>
+		<stazione rete="34" punto="998"/>
+	</datiEntrata>
+	<reg dataOraMittente="2025-02-05T16:13:22.217+01:00"/>
+</ns0:evento>

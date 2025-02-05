@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns0:evento xmlns:ns0="http://transit.pr.auto.aitek.it/messages">
+    <tipoEvento cod="U" />
+    <idSpaziale periferica="62" progrMsg="4" corsia="0" dirMarcia="1" tipoPeriferica="P" rete="1" punto="412" />
+    <idTemporale>2025-02-02T16:16:31.808+01:00</idTemporale>
+    <infoVeicolo classe="10">
+        <targaAnt nomeFile="targaAnt.jpg" affid="9" nazione="IT">WZ222RG</targaAnt>
+        <targaPost nomeFile="targaPost.jpg" affid="9" nazione="IT">WZ222RG</targaPost>  
+        <targaRif nazione="IT">WZ222RG</targaRif>
+        <OBU>690551095</OBU>
+	</infoVeicolo>
+    <idViaggio mezzoPagamento="TL" />
+	<datiEntrata idTemporale="2025-02-02T16:14:31.807+01:00" pista="12" classe="10">
+        <stazione rete = "1" punto = "410"/>
+    </datiEntrata>
+    <reg dataOraMittente="2025-02-05T16:12:31.808+01:00" />
+</ns0:evento>

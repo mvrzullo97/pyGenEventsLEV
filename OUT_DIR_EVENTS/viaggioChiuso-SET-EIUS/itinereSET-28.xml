@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns2:evento xmlns:ns2="http://transit.pr.auto.aitek.it/messages">
+	<tipoEvento cod="I"/>
+	<idSpaziale periferica="2" progrMsg="54171" corsia="2" dirMarcia="2" tipoPeriferica="B" rete="41" punto="28"/>
+	<idTemporale>"2025-02-05T04:16:53.420+01:00"</idTemporale>
+	<infoVeicolo classe="10">
+		<targaAnt/>
+		<targaPost/>
+		<targaRif/>
+		<SET CodiceIssuer="151" PAN="2025020516134299726F" nazione="IT" EFCContextMark="604006001D09"/>
+    </infoVeicolo>
+	<datiEntrata idTemporale="2025-02-05T04:15:53.419+01:00" pista="2">
+		<stazione punto="410"/>
+	</datiEntrata>
+	<reg dataOraMittente="2025-02-05T16:13:53.420+01:00"/>
+</ns2:evento>
