@@ -316,19 +316,13 @@ def genEventoScontoCashbackXml(dict_cashback) -> string:
 
 def checkInput(args_dict) -> string:
     
-    response = ("", "Y", "y", "s", "S", "n", "N")
+    pos_res = ("Y", "y", "S", "s")
+    response = ("", "n", "N")+pos_res
     tratta = args_dict["arg_tratta"] 
-    rete_entrata = args_dict["arg_rete_e"] 
-    rete_uscita = args_dict["arg_rete_u"] 
-    rete_itinere = args_dict["arg_rete_i"]
     rete_svincolo = args_dict["arg_rete_s"] 
-    punto_entrata = args_dict["arg_punto_e"] 
-    punto_uscita = args_dict["arg_punto_u"] 
-    punto_itinere= args_dict["arg_punto_i"] 
     punto_svincolo = args_dict["arg_punto_s"] 
     dati_entrata = args_dict["arg_bool_dati_entrata"]
     cod_apparato = args_dict["arg_cod_apparato"] 
-    cod_service_provider = args_dict["arg_service_provider"] 
     cashback = args_dict["arg_bool_cashback"]
 
     if tratta in ("US", "SU") and dati_entrata in pos_res :
@@ -559,9 +553,9 @@ while i < len(tratta) :
             print(f"............Uscita '{punto_uscita}' il '{id_temp_uscita}'")
             i+=1
         case "S":
-            print(f"............{tipo_svincolo} '{punto_svincolo}' il '{id_temp_svincolo}'\n\n")
+            print(f"............{tipo_svincolo} '{punto_svincolo}' il '{id_temp_svincolo}'")
             i+=1    
 
-print(f"...esecuzione terminata, tutti i file sono presenti al path: '{folder_path}'\n")
+print(f"\n...esecuzione terminata, tutti i file sono presenti al path: '{folder_path}'\n")
     
 
